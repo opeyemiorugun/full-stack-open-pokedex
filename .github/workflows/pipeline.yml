@@ -14,7 +14,7 @@ jobs:
   simple-deployment-pipeline:
     runs-on: ubuntu-latest
     outputs:
-      condition: ${{ env.CONDITION }}
+      proceed_tag: ${{ steps.deploy.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,12 +28,13 @@ jobs:
         run: npm run test
       - name: Trigger deployment
         if: github.event_name == 'push' && env.CONDITION == 'false'
+        id: deploy
         run: curl https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }}
 
   tag_release:
     needs: [simple-deployment-pipeline]
     runs-on: ubuntu-latest
-    if: ${{ needs.simple-deployment-pipeline.outputs.condition == 'false' }}
+    if: ${{ needs.simple-deployment-pipeline.outputs.proceed_tag == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Bump version and push tag
