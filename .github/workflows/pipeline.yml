@@ -6,10 +6,15 @@ on:
   pull_request:
     branches: [ main ]
     types: [ opened, synchronize ]
+  workflow_dispatch:
+env:
+  CONDITION: ${{ contains(github.event.head_commit.message, '#skip') }}
 
 jobs:
   simple-deployment-pipeline:
     runs-on: ubuntu-latest
+    outputs:
+      proceed_tag: ${{ steps.deploy.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,16 +27,19 @@ jobs:
       - name: Run tests
         run: npm run test
       - name: Trigger deployment
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && env.CONDITION == 'false'
+        id: deploy
         run: curl https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }}
+
   tag_release:
     needs: [simple-deployment-pipeline]
     runs-on: ubuntu-latest
+    if: ${{ needs.simple-deployment-pipeline.outputs.proceed_tag == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Bump version and push tag
         if: github.event_name == 'push'
-        uses: anothrNick/github-tag-action@1.75.0
+        uses: anothrNick/github-tag-action@4ed44965e0db8dab2b466a16da04aec3cc312fd8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BUMP: patch
